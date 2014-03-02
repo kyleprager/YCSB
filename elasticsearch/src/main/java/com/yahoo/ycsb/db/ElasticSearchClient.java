@@ -1,28 +1,31 @@
 package com.yahoo.ycsb.db;
 
-import com.yahoo.ycsb.ByteIterator;
-import com.yahoo.ycsb.DB;
-import com.yahoo.ycsb.DBException;
-import com.yahoo.ycsb.StringByteIterator;
+import static org.elasticsearch.common.settings.ImmutableSettings.settingsBuilder;
+import static org.elasticsearch.common.xcontent.XContentFactory.jsonBuilder;
+import static org.elasticsearch.index.query.FilterBuilders.rangeFilter;
+import static org.elasticsearch.index.query.QueryBuilders.matchAllQuery;
+import static org.elasticsearch.node.NodeBuilder.nodeBuilder;
+
 import java.util.HashMap;
 import java.util.Map.Entry;
 import java.util.Properties;
 import java.util.Set;
 import java.util.Vector;
+
 import org.elasticsearch.action.get.GetResponse;
 import org.elasticsearch.action.search.SearchResponse;
 import org.elasticsearch.client.Client;
 import org.elasticsearch.client.Requests;
-import static org.elasticsearch.common.settings.ImmutableSettings.*;
 import org.elasticsearch.common.settings.ImmutableSettings.Builder;
 import org.elasticsearch.common.xcontent.XContentBuilder;
-import static org.elasticsearch.common.xcontent.XContentFactory.*;
-import static org.elasticsearch.index.query.FilterBuilders.*;
-import static org.elasticsearch.index.query.QueryBuilders.*;
 import org.elasticsearch.index.query.RangeFilterBuilder;
 import org.elasticsearch.node.Node;
-import static org.elasticsearch.node.NodeBuilder.*;
 import org.elasticsearch.search.SearchHit;
+
+import com.yahoo.ycsb.ByteIterator;
+import com.yahoo.ycsb.DB;
+import com.yahoo.ycsb.DBException;
+import com.yahoo.ycsb.StringByteIterator;
 
 /**
  * ElasticSearch client for YCSB framework.
@@ -47,31 +50,38 @@ public class ElasticSearchClient extends DB {
      */
     @Override
     public void init() throws DBException {
-        // initialize OrientDB driver
+        // initialize ElasticSearch driver
         Properties props = getProperties();
         this.indexKey = props.getProperty("es.index.key", DEFAULT_INDEX_KEY);
         String clusterName = props.getProperty("cluster.name", DEFAULT_CLUSTER_NAME);
         Boolean newdb = Boolean.parseBoolean(props.getProperty("elasticsearch.newdb", "false"));
         Builder settings = settingsBuilder()
-                .put("node.local", "true")
-                .put("path.data", System.getProperty("java.io.tmpdir") + "/esdata")
-                .put("discovery.zen.ping.multicast.enabled", "false")
-                .put("index.mapping._id.indexed", "true")
+                // setting node.local to true throws an exception
+                .put("node.local", false)
+                .put("path.data", System.getProperty("java.io.tmpdir") + "esdata")
+                // setting discovery.zen.ping.multicast.enabled to false throws an exception
+                .put("discovery.zen.ping.multicast.enabled", true)
+                .put("index.mapping._id.indexed", true)
                 .put("index.gateway.type", "none")
                 .put("gateway.type", "none")
                 .put("index.number_of_shards", "1")
-                .put("index.number_of_replicas", "0");
+                .put("index.number_of_replicas", "0")
+                .put("client.transport.ignore_cluster_name", true)
+                .put("cluster.name", clusterName);
 
-
-        //if properties file contains elasticsearch user defined properties
-        //add it to the settings file (will overwrite the defaults).
+        // if properties file contains elasticsearch user defined properties
+        // add it to the settings file (will overwrite the defaults).
         settings.put(props);
         System.out.println("ElasticSearch starting node = " + settings.get("cluster.name"));
         System.out.println("ElasticSearch node data path = " + settings.get("path.data"));
 
+        // create node client
         node = nodeBuilder().clusterName(clusterName).settings(settings).node();
         node.start();
         client = node.client();
+        
+        // uncomment to alternatively create a transport client
+//      client = new TransportClient(settings.build()).addTransportAddress(new InetSocketTransportAddress("localhost", 9300));
 
         if (newdb) {
             client.admin().indices().prepareDelete(indexKey).execute().actionGet();
@@ -86,10 +96,12 @@ public class ElasticSearchClient extends DB {
 
     @Override
     public void cleanup() throws DBException {
-        if (!node.isClosed()) {
+        if (node != null && !node.isClosed()) {
             client.close();
             node.stop();
             node.close();
+        } else {
+            client.close();
         }
     }
 
@@ -240,7 +252,7 @@ public class ElasticSearchClient extends DB {
             final SearchResponse response = client.prepareSearch(indexKey)
                     .setTypes(table)
                     .setQuery(matchAllQuery())
-                    .setFilter(filter)
+                    .setPostFilter(filter)
                     .setSize(recordcount)
                     .execute()
                     .actionGet();
