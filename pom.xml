@@ -76,6 +76,7 @@
     <module>redis</module>
     <module>voldemort</module>
     <module>distribution</module>
+    <module>couchbase-2.0</module>
   </modules>
 
   <build>

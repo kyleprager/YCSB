@@ -16,7 +16,9 @@ import org.elasticsearch.action.get.GetResponse;
 import org.elasticsearch.action.search.SearchResponse;
 import org.elasticsearch.client.Client;
 import org.elasticsearch.client.Requests;
+import org.elasticsearch.client.transport.TransportClient;
 import org.elasticsearch.common.settings.ImmutableSettings.Builder;
+import org.elasticsearch.common.transport.InetSocketTransportAddress;
 import org.elasticsearch.common.xcontent.XContentBuilder;
 import org.elasticsearch.index.query.RangeFilterBuilder;
 import org.elasticsearch.node.Node;
@@ -54,6 +56,7 @@ public class ElasticSearchClient extends DB {
         Properties props = getProperties();
         this.indexKey = props.getProperty("es.index.key", DEFAULT_INDEX_KEY);
         String clusterName = props.getProperty("cluster.name", DEFAULT_CLUSTER_NAME);
+        String useTransportClient = props.getProperty("transport.client", null);
         Boolean newdb = Boolean.parseBoolean(props.getProperty("elasticsearch.newdb", "false"));
         Builder settings = settingsBuilder()
                 // setting node.local to true throws an exception
@@ -75,13 +78,17 @@ public class ElasticSearchClient extends DB {
         System.out.println("ElasticSearch starting node = " + settings.get("cluster.name"));
         System.out.println("ElasticSearch node data path = " + settings.get("path.data"));
 
-        // create node client
-        node = nodeBuilder().clusterName(clusterName).settings(settings).node();
-        node.start();
-        client = node.client();
-        
-        // uncomment to alternatively create a transport client
-//      client = new TransportClient(settings.build()).addTransportAddress(new InetSocketTransportAddress("localhost", 9300));
+        if (useTransportClient != null && !useTransportClient.equals("false")) {
+            // create transport client
+            System.out.println("Using transport client.");
+            client = new TransportClient(settings.build()).addTransportAddress(new InetSocketTransportAddress("localhost", 9300));
+        } else {
+            // create node client
+            System.out.println("Using node client.");
+            node = nodeBuilder().clusterName(clusterName).settings(settings).node();
+            node.start();
+            client = node.client();
+        }
 
         if (newdb) {
             client.admin().indices().prepareDelete(indexKey).execute().actionGet();

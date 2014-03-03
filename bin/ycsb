@@ -25,6 +25,7 @@ COMMANDS = {
 
 DATABASES = {
     "basic"        : "com.yahoo.ycsb.BasicDB",
+    "couchbase-2.0": "com.yahoo.ycsb.db.CouchbaseClient2_0",
     "cassandra-7"  : "com.yahoo.ycsb.db.CassandraClient7",
     "cassandra-8"  : "com.yahoo.ycsb.db.CassandraClient8",
     "cassandra-10" : "com.yahoo.ycsb.db.CassandraClient10",
