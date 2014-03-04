@@ -57,6 +57,8 @@ public class ElasticSearchClient extends DB {
         this.indexKey = props.getProperty("es.index.key", DEFAULT_INDEX_KEY);
         String clusterName = props.getProperty("cluster.name", DEFAULT_CLUSTER_NAME);
         String useTransportClient = props.getProperty("transport.client", null);
+        String host = props.getProperty("host", "localhost");
+        String port = props.getProperty("port", "9300");
         Boolean newdb = Boolean.parseBoolean(props.getProperty("elasticsearch.newdb", "false"));
         Builder settings = settingsBuilder()
                 // setting node.local to true throws an exception
@@ -81,7 +83,7 @@ public class ElasticSearchClient extends DB {
         if (useTransportClient != null && !useTransportClient.equals("false")) {
             // create transport client
             System.out.println("Using transport client.");
-            client = new TransportClient(settings.build()).addTransportAddress(new InetSocketTransportAddress("localhost", 9300));
+            client = new TransportClient(settings.build()).addTransportAddress(new InetSocketTransportAddress(host, Integer.valueOf(port)));
         } else {
             // create node client
             System.out.println("Using node client.");
